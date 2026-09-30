@@ -8,6 +8,19 @@ primary_slo:
   target_percent: 99.5
   error_budget_percent: 0.5
   note: Học viên phải giải thích hoặc điều chỉnh ngưỡng bằng baseline của mình. Ví dụ nếu có 10,000 request trong cửa sổ 28 ngày, error budget 0.5% nghĩa là tối đa 50 request được phép không đạt SLO.
+  rationale: >-
+    Giữ ngưỡng 3000 ms và target 99.5%. Baseline đo ngày 2026-09-30 trên 21 request bình thường:
+    latency 383–1438 ms, P95 ≈ 1125 ms, TTFT 50 ms. Ngưỡng 3000 ms cho khoảng 2.7x headroom so với
+    P95 bình thường nên không báo động giả do dao động, nhưng vẫn bắt được khi retrieval chậm:
+    5 request trong lúc bật practice incident rag_slow mất 2900–3699 ms (retrieval ~2.5 s). SLI tính
+    request lỗi (không có response_sent) là bad event, nên một SLO gộp cả tốc độ và thành công.
+    Hạn chế: request rag_slow ở 2900–2993 ms vẫn nằm dưới ngưỡng, nên alert latency được bổ sung
+    bằng panel/alert khác thay vì hạ ngưỡng SLO khi mới có 21 mẫu baseline.
+  error_budget:
+    window_requests_example: 10000
+    allowed_bad_requests: 50
+    formula: 'allowed_bad = total_requests * (100 - target_percent) / 100'
+    burn_rate: 'burn_rate = (bad / total trong cửa sổ ngắn) / 0.005; burn_rate 1 = tiêu hết budget đúng 28 ngày, burn_rate 14.4 = hết budget trong ~2 ngày'
 guardrails:
   error_rate_pct_max: 2
   daily_cost_usd_max: 2.5

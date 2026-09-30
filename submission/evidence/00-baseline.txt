@@ -1,0 +1,38 @@
+# CP0 baseline — starter code (chưa sửa TODO), đo ngày 2026-09-30
+
+> python scripts/load_test.py
+[200] MISSING | qa | 1039.0ms
+[200] MISSING | qa | 388.0ms
+[200] MISSING | summary | 390.9ms
+[200] MISSING | qa | 411.3ms
+[200] MISSING | qa | 396.5ms
+[200] MISSING | summary | 522.3ms
+[200] MISSING | qa | 385.4ms
+[200] MISSING | qa | 432.7ms
+[200] MISSING | qa | 418.2ms
+[200] MISSING | qa | 400.9ms
+
+> python scripts/validate_logs.py
+--- Lab Verification Results ---
+Total log records analyzed: 21
+Records with missing required fields: 20
+Records with missing enrichment (context): 20
+Unique correlation IDs found: 0
+Potential PII leaks detected: 0
+
+--- Grading Scorecard (Estimates) ---
+- [FAILED] Missing required fields (ts, level, etc.)
+- [FAILED] Correlation ID propagation (less than 2 unique IDs)
+- [FAILED] Log enrichment (missing user_id_hash, etc.)
++ [PASSED] PII scrubbing
+
+Estimated Score: 30/100
+
+> python scripts/validate_dashboard.py
+HỢP LỆ: 6/6 panel có trong dashboard contract.
+
+> python -m pytest -q
+ERROR collecting tests/test_validate_logs.py
+E   ImportError: cannot import name 'validate_logs' from 'scripts' (C:\Users\ADMIN\miniconda3\Lib\site-packages\scripts\__init__.py)
+!!! Interrupted: 1 error during collection !!!
+1 error in 0.79s

@@ -1,0 +1,37 @@
+# 12 - Incident metric | Challenge ID: day13-k4-l3b-monitoring-llmops-v1
+# Nguồn: data/logs.jsonl (nguồn của dashboard), cùng cách tính percentile như app/metrics.py
+# Thời gian: UTC (giờ VN = UTC+7)
+
+Cửa sổ                                       từ (VN)                n    P50    P95    P99  TTFT95  err%  retr%   avgCost  avgOut quality
+baseline (rag_slow OFF)                      2026-10-01 00:13:33   10    391   2293   2293      50   0.0  100.0  0.002311   147.3    0.88
+incident (rag_slow ON, challenge load)       2026-10-01 00:13:40    5   2888   2900   2900      50   0.0  100.0  0.002196   139.4    0.84
+sau fix (rag_slow OFF, chạy lại challenge)   2026-10-01 00:15:13    5    388    925    925      50   0.0  100.0  0.002070   131.0    0.84
+
+Đơn vị: latency/TTFT = ms; err%/retr% = error rate / retrieval success (%); avgCost = USD/request; avgOut = tokens_out/request.
+
+Nhận xét:
+- Chỉ latency tăng: P50 ~390 ms -> ~2890 ms (x7.4), vượt latency_threshold_ms=2000 của challenge ở 5/5 request.
+- TTFT P95 giữ 50 ms, error rate 0%, retrieval success 100%, cost/token/quality không đổi
+  => phần chậm nằm TRƯỚC bước LLM (không phải model/prompt/token), và không phải lỗi mà là chậm.
+- Alert HighLatencyP95 (p95 > 3000 ms) KHÔNG kích hoạt vì P95 = 2900 ms nằm ngay dưới ngưỡng -> lỗ hổng alerting.
+- Lưu ý: P95 baseline 2293 ms và 925 ms sau fix đều do 1 request đầu cửa sổ (req-b289a6fc, req-8b6c55fd)
+  chờ fetch prompt Langfuse khi cache trống/hết TTL 60 s (trace: retrieval ~0 ms, khoảng trống trước generation);
+  9/10 request baseline còn lại 384-396 ms. Đây là cold-start riêng, không phải incident.
+
+Latency phía client (scripts/load_test.py --challenge --concurrency 5), đo end-to-end:
+  incident [200] req-cf45e3d5 | monitoring | 8698.2ms
+  incident [200] req-bbe99f0a | monitoring | 11593.6ms
+  incident [200] req-f77dd35d | monitoring | 14486.8ms
+  incident [200] req-63f8c938 | monitoring | 14485.8ms
+  incident [200] req-7b9cd4df | monitoring | 14486.9ms
+  sau fix  [200] req-8b6c55fd | monitoring | 2122.2ms
+  sau fix  [200] req-118dc053 | monitoring | 2513.2ms
+  sau fix  [200] req-641e5cbf | monitoring | 2513.7ms
+  sau fix  [200] req-03c8f11d | monitoring | 2513.8ms
+  sau fix  [200] req-07b38321 | monitoring | 2514.3ms
+  -> client chờ 8.7-14.5 s dù server ghi ~2.9 s/request: agent.run() đồng bộ (time.sleep) chạy trong
+     handler async nên chặn event loop, 5 request đồng thời bị xếp hàng nối tiếp (5 x 2.9 s = 14.5 s).
+
+Snapshot GET /metrics (in-memory, từ lúc khởi động API):
+  trước incident: {"traffic":10,"latency_p50":391.0,"latency_p95":2293.0,"latency_p99":2293.0,"ttft_p95":50.0,"avg_cost_usd":0.0023,"total_cost_usd":0.0231,"tokens_in_total":338,"tokens_out_total":1473,"error_breakdown":{},"quality_avg":0.88}
+  sau incident  : {"traffic":15,"latency_p50":394.0,"latency_p95":2900.0,"latency_p99":2900.0,"ttft_p95":50.0,"avg_cost_usd":0.0023,"total_cost_usd":0.0341,"tokens_in_total":513,"tokens_out_total":2170,"error_breakdown":{},"quality_avg":0.8667}

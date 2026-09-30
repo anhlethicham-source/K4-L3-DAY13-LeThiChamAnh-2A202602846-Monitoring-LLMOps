@@ -1,0 +1,40 @@
+# 14 - Incident trace | Challenge ID: day13-k4-l3b-monitoring-llmops-v1
+# Nguồn: Langfuse project day13-k4-l3b-2A202602846, GET /api/public/v2/observations
+
+correlation_id : req-cf45e3d5
+trace_id       : 69a323929dfb82873da6fbf71e4d1027
+trace name     : day13-agent-request | start 2026-09-30T17:13:40.355Z (VN 2026-10-01 00:13:40)
+metadata       : {"correlation_id": "req-cf45e3d5", "feature": "monitoring", "model": "claude-sonnet-4-5", "prompt_name": "day13-chat", "prompt_label": "production", "prompt_version": "local-v1", "prompt_source": "local-fallback", "doc_count": 1}
+
+Span tree (latency, % của root):
+  lab-agent-run  [agent]       2901 ms  100%
+  ├── retrieval  [retriever]   2501 ms  86%   level=DEFAULT
+  └── llm-generation [generation]   152 ms  5%   TTFT=50 ms tokens=163 cost=$0.002025
+  (còn lại ~248 ms: resolve prompt / overhead giữa hai span, không đổi so với baseline)
+
+So sánh mọi trace trong cửa sổ (nối với log qua metadata.correlation_id):
+phase     correlation_id trace_id                               root  retrieval  generation   TTFT tokens
+baseline  req-b289a6fc   98c7bb762f384d76dabd19cacdd19f25    2294 ms       0 ms      151 ms  50 ms    194
+baseline  req-9ba8f180   1765796163340606180f316e1a7b28a4     391 ms       1 ms      153 ms  51 ms    198
+baseline  req-e3158769   3152b8a4d3c62b1f8623af41141fead7     392 ms       1 ms      154 ms  51 ms    191
+baseline  req-2a577dc1   65504cae220856f5692bc85701ca76ad     389 ms       0 ms      152 ms  50 ms    168
+baseline  req-fc4b567e   d110df7e924e274d3cf4710fae8717a8     393 ms       0 ms      152 ms  50 ms    181
+baseline  req-c7d04700   0174e22cf9dbecff9f887c8a362e5137     386 ms       1 ms      152 ms  51 ms    156
+baseline  req-dea97246   0c80e715a3388b05efc31ef42d32f6b4     398 ms       1 ms      151 ms  50 ms    199
+baseline  req-3af47116   67f57e6941239ede262498f2d99600bc     395 ms       0 ms      151 ms  50 ms    120
+baseline  req-867a3cb1   6215352cb871796800f935ec42a0e791     394 ms       0 ms      152 ms  50 ms    204
+baseline  req-b4f0ab18   44f943e591a1a9b09249f8b4b713db2e     385 ms       1 ms      152 ms  51 ms    200
+incident  req-cf45e3d5   69a323929dfb82873da6fbf71e4d1027    2901 ms    2501 ms      152 ms  50 ms    163
+incident  req-bbe99f0a   4f920edf80a78aa02cec11093e555f13    2888 ms    2502 ms      152 ms  50 ms    139
+incident  req-f77dd35d   c23279ba9c433108ae5ded549d64d8bb    2887 ms    2501 ms      154 ms  50 ms    203
+incident  req-63f8c938   e23db593d9f5d56e700cdb8860028075    2890 ms    2501 ms      154 ms  51 ms    197
+incident  req-7b9cd4df   12d6cfa4a893ecf552d92842182c4f4a    2891 ms    2501 ms      151 ms  50 ms    170
+sau       req-8b6c55fd   4b103494fb0f0f904899f3c61165f7cb     926 ms       1 ms      151 ms  50 ms    209
+sau       req-118dc053   12e2f494af81f0c5f4cd4d3b661b944f     397 ms       1 ms      153 ms  50 ms    206
+sau       req-03c8f11d   81bac7590d1ee6e7c50768df61dd7029     389 ms       2 ms      153 ms  51 ms    132
+sau       req-641e5cbf   f83c088d0f37ea7b6beee306abf62edc     385 ms       0 ms      152 ms  50 ms    119
+sau       req-07b38321   082b72f67bd9e700e7e4723f1f091365     383 ms       1 ms      152 ms  50 ms    164
+
+Kết luận từ trace: retrieval tăng từ ~1 ms lên ~2501 ms (chiếm ~86% latency) ở cả 5 request incident;
+llm-generation (~152 ms), TTFT (50 ms), tokens và cost giữ nguyên, không span nào level=ERROR.
+=> Span gây ảnh hưởng: retrieval (bước RAG/vector store), không phải LLM hay prompt.
